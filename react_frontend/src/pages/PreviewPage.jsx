@@ -103,7 +103,7 @@ export default function PreviewPage() {
             aria-disabled={!hasValidUrl}
             onClick={(e) => { if (!hasValidUrl) e.preventDefault(); }}
           >
-            Open
+            🔗 Open
           </a>
           <a
             className="btn btn-primary"
@@ -112,7 +112,7 @@ export default function PreviewPage() {
             aria-disabled={!hasValidUrl}
             onClick={(e) => { if (!hasValidUrl) e.preventDefault(); }}
           >
-            Download
+            ⬇ Download
           </a>
         </div>
       </div>

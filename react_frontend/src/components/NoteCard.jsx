@@ -24,10 +24,17 @@ export default function NoteCard({ note }) {
 
   return (
     <article className="card" aria-label={`Note ${note.title}`} style={{ overflow: 'hidden' }}>
-      <div style={{ position: 'relative', height: 140, background: 'linear-gradient(135deg, rgba(37,99,235,0.12), rgba(255,255,255,0.8))' }}>
+      <div
+        style={{
+          position: 'relative',
+          height: 160,
+          background: 'var(--grad-primary-soft)'
+        }}
+      >
         <div style={{
           position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-          color: 'var(--color-primary)', fontSize: 42, opacity: 0.9
+          color: 'var(--color-primary)', fontSize: 44, opacity: 0.95,
+          textShadow: '0 6px 22px rgba(37,99,235,0.25)'
         }}>
           📄
         </div>
@@ -42,14 +49,16 @@ export default function NoteCard({ note }) {
 
       <div className="card-body">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 10,
-            display: 'grid', placeItems: 'center',
-            background: 'rgba(37,99,235,0.08)',
-            color: 'var(--color-primary)',
-            border: '1px solid rgba(37,99,235,0.2)',
-            fontSize: 12, fontWeight: 700
-          }}
+          <div
+            style={{
+              width: 36, height: 36, borderRadius: 12,
+              display: 'grid', placeItems: 'center',
+              background: 'rgba(37,99,235,0.10)',
+              color: 'var(--color-primary)',
+              border: '1px solid rgba(37,99,235,0.25)',
+              fontSize: 12, fontWeight: 800,
+              boxShadow: '0 2px 8px rgba(37,99,235,0.10)'
+            }}
             aria-hidden="true"
             title={note.author || 'Unknown'}
           >

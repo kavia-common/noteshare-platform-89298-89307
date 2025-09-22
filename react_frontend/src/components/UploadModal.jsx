@@ -240,12 +240,15 @@ export default function UploadModal({ onClose, onUploaded }) {
       <div className="modal">
         <div style={{
           padding: 18,
-          background: 'linear-gradient(180deg, rgba(37,99,235,0.08), rgba(255,255,255,0.9))',
+          background: 'linear-gradient(180deg, rgba(37,99,235,0.10), rgba(255,255,255,0.95))',
           borderBottom: '1px solid rgba(0,0,0,0.06)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between'
         }}>
-          <div className="kicker">Upload</div>
-          <button className="btn" onClick={onClose} title="Close" disabled={busy}>✕</button>
+          <div>
+            <div className="kicker">Upload</div>
+            <div className="title" style={{ marginTop: 4 }}>Add a new PDF</div>
+          </div>
+          <button className="btn btn-outlined" onClick={onClose} title="Close" disabled={busy}>✕</button>
         </div>
         <form onSubmit={doUpload} style={{ padding: 18, display: 'grid', gap: 12 }}>
           {!hasSession && (

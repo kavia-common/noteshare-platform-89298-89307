@@ -24,9 +24,10 @@ export default function ProfilePage() {
         <div style={{ padding: 18, display: 'grid', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 48, height: 48, borderRadius: 12, display: 'grid', placeItems: 'center',
-              background: 'rgba(37,99,235,0.08)', color: 'var(--color-primary)',
-              border: '1px solid rgba(37,99,235,0.2)', fontWeight: 700
+              width: 56, height: 56, borderRadius: 14, display: 'grid', placeItems: 'center',
+              background: 'rgba(37,99,235,0.10)', color: 'var(--color-primary)',
+              border: '1px solid rgba(37,99,235,0.28)', fontWeight: 800, fontSize: 18,
+              boxShadow: '0 4px 14px rgba(37,99,235,0.12)'
             }}>
               {user.email?.[0]?.toUpperCase()}
             </div>

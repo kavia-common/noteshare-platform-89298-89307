@@ -69,7 +69,7 @@ export default function Navbar({ session, onUpload }) {
           <label htmlFor={searchInputId} className="helper" style={{ position: 'absolute', left: -9999 }}>
             Search query
           </label>
-          <span aria-hidden="true" style={{ opacity: 0.75 }}>Search</span>
+          <span aria-hidden="true" style={{ opacity: 0.75 }}>🔎</span>
           <input
             id={searchInputId}
             value={q}
@@ -80,7 +80,7 @@ export default function Navbar({ session, onUpload }) {
           {q && (
             <button
               type="button"
-              className="btn"
+              className="btn btn-outlined"
               aria-label="Clear search"
               onClick={() => {
                 setQ('');
@@ -90,7 +90,7 @@ export default function Navbar({ session, onUpload }) {
               }}
               style={{ padding: '6px 10px' }}
             >
-              X
+              ✕
             </button>
           )}
           <span id={`${searchInputId}-desc`} className="helper" style={{ position: 'absolute', left: -9999 }}>
@@ -108,7 +108,7 @@ export default function Navbar({ session, onUpload }) {
             value={cat}
             onChange={(e) => onCategoryChange(e.target.value)}
             aria-label="Category filter"
-            style={{ maxWidth: 180 }}
+            style={{ maxWidth: 200 }}
           >
             <option value="all">All Categories</option>
             <option value="math">Mathematics</option>
@@ -123,7 +123,7 @@ export default function Navbar({ session, onUpload }) {
 
         <div className="nav-spacer" />
         <Link className="btn" to="/troubleshoot" aria-label="Open Supabase diagnostics" title="Troubleshoot">
-          Troubleshoot
+          🛠 Troubleshoot
         </Link>
 
         <button
@@ -133,19 +133,19 @@ export default function Navbar({ session, onUpload }) {
           type="button"
           title="Upload a PDF"
         >
-          Upload
+          ⬆ Upload
         </button>
 
         {session ? (
           <div role="group" aria-label="User menu" style={{ display: 'flex', gap: 8 }}>
-            <Link className="btn" to="/profile" aria-label="View profile" title="Profile">Profile</Link>
+            <Link className="btn" to="/profile" aria-label="View profile" title="Profile">👤 Profile</Link>
             <button className="btn" onClick={logout} type="button" aria-label="Log out" title="Log out">
-              Logout
+              ⎋ Logout
             </button>
           </div>
         ) : (
           <Link className="btn" to="/login" aria-label="Go to login" title="Log in">
-            Login
+            🔐 Login
           </Link>
         )}
       </div>

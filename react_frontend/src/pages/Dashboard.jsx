@@ -86,12 +86,7 @@ export default function Dashboard({ session, onUpload, refreshKey }) {
       }}>
         <div>
           <div className="kicker">Explore</div>
-          <h1 style={{
-            margin: '6px 0 0 0',
-            background: 'linear-gradient(90deg, #111827, #2563EB)',
-            WebkitBackgroundClip: 'text',
-            color: 'transparent'
-          }}>Latest Notes</h1>
+          <h1 className="h1-gradient">Latest Notes</h1>
         </div>
         <button className="btn btn-primary" onClick={onUpload} title="Upload a PDF">⬆ Upload</button>
       </section>

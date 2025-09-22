@@ -182,103 +182,119 @@ export default function AuthPage() {
   };
 
   return (
-    <main className="container" style={{ maxWidth: 520 }}>
-      <div className="card" style={{ overflow: 'hidden' }}>
-        <div style={{ padding: 18, background: 'linear-gradient(180deg, rgba(37,99,235,0.10), #fff)' }}>
-          <div className="kicker">
-            {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create account' : 'Reset password'}
+    <main className="container" style={{ maxWidth: 980 }}>
+      <div className="auth-shell">
+        <div className="auth-visual">
+          <div className="auth-visual-inner">
+            <div className="kicker">NoteShare</div>
+            <h2 className="h1-gradient" style={{ fontSize: 28, marginTop: 8 }}>Your library, beautifully organized.</h2>
+            <p className="helper" style={{ marginTop: 8 }}>
+              Upload PDFs, browse elegant previews, and share knowledge. Powered by Supabase Auth and Storage.
+            </p>
+            <ul className="helper" style={{ marginTop: 14, lineHeight: 1.6 }}>
+              <li>Secure email authentication</li>
+              <li>Public previews with smooth performance</li>
+              <li>Fast search and category filters</li>
+            </ul>
           </div>
-          <h2 style={{ margin: '6px 0 0 0' }}>NoteShare</h2>
         </div>
+        <div className="auth-form">
+          <div style={{ paddingBottom: 8 }}>
+            <div className="kicker">
+              {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create account' : 'Reset password'}
+            </div>
+            <h2 style={{ margin: '6px 0 0 0' }}>Sign {mode === 'login' ? 'in' : mode === 'signup' ? 'up' : 'reset'}</h2>
+          </div>
 
-        <form onSubmit={onSubmit} style={{ padding: 18, display: 'grid', gap: 12 }}>
-          <label>
-            <div className="kicker" style={{ marginBottom: 6 }}>Email</div>
-            <input
-              className="input"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="you@example.com"
-              autoComplete="email"
-              aria-invalid={email.length > 0 && !emailLooksValid}
-            />
-          </label>
-
-          {mode !== 'reset' && (
+          <form onSubmit={onSubmit} style={{ display: 'grid', gap: 12 }}>
             <label>
-              <div className="kicker" style={{ marginBottom: 6 }}>Password</div>
+              <div className="kicker" style={{ marginBottom: 6 }}>Email</div>
               <input
                 className="input"
-                type="password"
-                value={pass}
-                onChange={(e) => setPass(e.target.value)}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="••••••••"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                placeholder="you@example.com"
+                autoComplete="email"
+                aria-invalid={email.length > 0 && !emailLooksValid}
               />
             </label>
-          )}
 
-          {mode === 'signup' && (
-            <label>
-              <div className="kicker" style={{ marginBottom: 6 }}>Confirm Password</div>
-              <input
-                className="input"
-                type="password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-                placeholder="••••••••"
-                autoComplete="new-password"
-              />
-            </label>
-          )}
-
-          {renderPasswordHelpers()}
-
-          {error && (
-            <div role="alert" aria-live="polite" style={{ color: 'var(--color-error)' }}>
-              {error}
-            </div>
-          )}
-          {!error && info && (
-            <div role="status" aria-live="polite" className="helper" style={{ color: 'green' }}>
-              {info}
-            </div>
-          )}
-
-          <button className="btn btn-primary" disabled={busy || (mode !== 'reset' && !emailLooksValid)} type="submit">
-            {busy ? 'Please wait…' :
-              mode === 'login' ? 'Log In' :
-              mode === 'signup' ? 'Sign Up' : 'Send Reset Email'}
-          </button>
-
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {mode !== 'login' && (
-              <button type="button" className="btn" onClick={() => switchMode('login')}>
-                Have an account? Log in
-              </button>
-            )}
-            {mode !== 'signup' && (
-              <button type="button" className="btn" onClick={() => switchMode('signup')}>
-                Need an account? Sign up
-              </button>
-            )}
             {mode !== 'reset' && (
-              <button type="button" className="btn" onClick={() => switchMode('reset')}>
-                Forgot password?
-              </button>
+              <label>
+                <div className="kicker" style={{ marginBottom: 6 }}>Password</div>
+                <input
+                  className="input"
+                  type="password"
+                  value={pass}
+                  onChange={(e) => setPass(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                />
+              </label>
             )}
-          </div>
 
-          <div className="helper">
-            Tip: After signing up, we send a verification link. Ensure your Supabase Authentication URL settings include:
-            <br />
-            <code>{getURL()}</code>
-          </div>
-        </form>
+            {mode === 'signup' && (
+              <label>
+                <div className="kicker" style={{ marginBottom: 6 }}>Confirm Password</div>
+                <input
+                  className="input"
+                  type="password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                />
+              </label>
+            )}
+
+            {renderPasswordHelpers()}
+
+            {error && (
+              <div role="alert" aria-live="polite" style={{ color: 'var(--color-error)' }}>
+                {error}
+              </div>
+            )}
+            {!error && info && (
+              <div role="status" aria-live="polite" className="helper" style={{ color: 'green' }}>
+                {info}
+              </div>
+            )}
+
+            <button className="btn btn-primary" disabled={busy || (mode !== 'reset' && !emailLooksValid)} type="submit">
+              {busy ? 'Please wait…' :
+                mode === 'login' ? 'Log In' :
+                mode === 'signup' ? 'Sign Up' : 'Send Reset Email'}
+            </button>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+              {mode !== 'login' && (
+                <button type="button" className="btn" onClick={() => switchMode('login')}>
+                  Have an account? Log in
+                </button>
+              )}
+              {mode !== 'signup' && (
+                <button type="button" className="btn" onClick={() => switchMode('signup')}>
+                  Need an account? Sign up
+                </button>
+              )}
+              {mode !== 'reset' && (
+                <button type="button" className="btn btn-outlined" onClick={() => switchMode('reset')}>
+                  Forgot password?
+                </button>
+              )}
+            </div>
+
+            <div className="helper" style={{ marginTop: 8 }}>
+              Tip: After signing up, we send a verification link. Ensure your Supabase Authentication URL settings include:
+              <br />
+              <code>{getURL()}</code>
+            </div>
+          </form>
+        </div>
       </div>
     </main>
   );
