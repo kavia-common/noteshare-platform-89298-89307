@@ -1,85 +1,244 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { getURL } from '../utils/getURL';
 
 // PUBLIC_INTERFACE
 export default function AuthPage() {
-  /** Login/Signup with Supabase email/password, using Ocean Professional styling. */
-  const [mode, setMode] = useState('login');
+  /**
+   * Login/Signup with Supabase email/password:
+   * - Strong password validation on signup
+   * - Clear error mapping for common Supabase errors
+   * - Email verification guidance after signup
+   * - Password reset flow
+   */
+  const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'reset'
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const navigate = useNavigate();
 
-  const doAuth = async (e) => {
+  // Password policy: at least 8 chars, include a number and a letter
+  const passIssues = useMemo(() => {
+    if (mode !== 'signup') return [];
+    const issues = [];
+    if (pass.length < 8) issues.push('At least 8 characters');
+    if (!/[a-zA-Z]/.test(pass)) issues.push('Include a letter');
+    if (!/[0-9]/.test(pass)) issues.push('Include a number');
+    if (confirm && pass !== confirm) issues.push('Passwords must match');
+    return issues;
+  }, [pass, confirm, mode]);
+
+  const mapAuthError = (err) => {
+    const raw = err?.message || 'Authentication failed.';
+    const msg = raw.toLowerCase();
+    if (msg.includes('invalid login credentials')) {
+      return 'Invalid email or password. Please try again.';
+    }
+    if (msg.includes('email') && msg.includes('not confirmed')) {
+      return 'Email not confirmed. Please check your inbox for the verification link.';
+    }
+    if (msg.includes('email') && msg.includes('already registered')) {
+      return 'This email is already registered. Try logging in or use password reset.';
+    }
+    if (msg.includes('rate limit')) {
+      return 'Too many attempts. Please wait a moment and try again.';
+    }
+    if (msg.includes('redirect') || msg.includes('url')) {
+      return 'Redirect URL is not allowed. Open Troubleshoot and verify Authentication URL settings.';
+    }
+    if (msg.includes('network') || msg.includes('fetch')) {
+      return 'Network error connecting to Supabase. Check your internet and Supabase URL.';
+    }
+    if (msg.includes('apikey') || msg.includes('jwt') || msg.includes('secret')) {
+      return 'Invalid Supabase key. Ensure REACT_APP_SUPABASE_KEY is the anon public key.';
+    }
+    if (msg.includes('password') && msg.includes('too short')) {
+      return 'Password too short. Use at least 8 characters.';
+    }
+    return raw;
+  };
+
+  const switchMode = (next) => {
+    setMode(next);
+    setError('');
+    setInfo('');
+    setPass('');
+    setConfirm('');
+  };
+
+  const doLogin = async () => {
+    const { error: err } = await supabase.auth.signInWithPassword({ email, password: pass });
+    if (err) throw err;
+  };
+
+  const doSignup = async () => {
+    if (passIssues.length > 0) {
+      throw new Error('Password does not meet requirements.');
+    }
+    const redirectTo = getURL();
+    const { data, error: err } = await supabase.auth.signUp({
+      email,
+      password: pass,
+      options: {
+        emailRedirectTo: redirectTo
+      }
+    });
+    if (err) throw err;
+    // On many configs, session is null until email verified:
+    if (!data?.session) {
+      setInfo('Signup successful. Please check your email and click the verification link to complete sign-in.');
+    }
+  };
+
+  const doReset = async () => {
+    // Send password reset email
+    const redirectTo = getURL();
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo
+    });
+    if (err) throw err;
+    setInfo('Password reset email sent. Check your inbox and follow the link to set a new password.');
+  };
+
+  const onSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setInfo('');
     setBusy(true);
     try {
       if (mode === 'login') {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password: pass });
-        if (err) throw err;
+        await doLogin();
         navigate('/');
-      } else {
-        const redirectTo = getURL();
-        const { error: err } = await supabase.auth.signUp({
-          email,
-          password: pass,
-          options: {
-            emailRedirectTo: redirectTo
-          }
-        });
-        if (err) throw err;
-        alert('Signup successful. Please check your email for verification link.');
-        navigate('/');
+      } else if (mode === 'signup') {
+        await doSignup();
+        // Stay on page to show verification info; do not redirect immediately
+      } else if (mode === 'reset') {
+        await doReset();
       }
     } catch (err) {
-      const msg = (err?.message || '').toLowerCase();
-      let friendly = err?.message || 'Authentication failed.';
-      if (msg.includes('invalid login credentials')) {
-        friendly = 'Invalid email or password. Please try again.';
-      } else if (msg.includes('email') && msg.includes('not confirmed')) {
-        friendly = 'Email not confirmed. Please check your inbox for the verification link.';
-      } else if (msg.includes('rate limit')) {
-        friendly = 'Too many attempts. Please wait a moment and try again.';
-      } else if (msg.includes('redirect') || msg.includes('url')) {
-        friendly = 'Redirect URL is not allowed. Open Troubleshoot and verify Authentication URL settings.';
-      } else if (msg.includes('network') || msg.includes('fetch')) {
-        friendly = 'Network error connecting to Supabase. Check your internet and Supabase URL.';
-      } else if (msg.includes('apikey') || msg.includes('jwt') || msg.includes('secret')) {
-        friendly = 'Invalid Supabase key. Ensure REACT_APP_SUPABASE_KEY is the anon public key.';
-      }
+      const friendly = mapAuthError(err);
       setError(friendly + ' (See Troubleshoot for help)');
     } finally {
       setBusy(false);
     }
   };
 
+  const renderPasswordHelpers = () => {
+    if (mode !== 'signup') return null;
+    const hasIssue = passIssues.length > 0;
+    return (
+      <div className="helper" style={{ color: hasIssue ? 'var(--color-error)' : 'inherit' }}>
+        Password requirements:
+        <ul style={{ margin: '6px 0 0 18px' }}>
+          <li style={{ color: pass.length >= 8 ? 'green' : 'inherit' }}>At least 8 characters</li>
+          <li style={{ color: /[a-zA-Z]/.test(pass) ? 'green' : 'inherit' }}>Include a letter</li>
+          <li style={{ color: /[0-9]/.test(pass) ? 'green' : 'inherit' }}>Include a number</li>
+          <li style={{ color: confirm && pass === confirm ? 'green' : 'inherit' }}>Passwords match</li>
+        </ul>
+      </div>
+    );
+  };
+
   return (
-    <main className="container" style={{ maxWidth: 480 }}>
+    <main className="container" style={{ maxWidth: 520 }}>
       <div className="card" style={{ overflow: 'hidden' }}>
         <div style={{ padding: 18, background: 'linear-gradient(180deg, rgba(37,99,235,0.10), #fff)' }}>
-          <div className="kicker">{mode === 'login' ? 'Welcome back' : 'Create account'}</div>
+          <div className="kicker">
+            {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create account' : 'Reset password'}
+          </div>
           <h2 style={{ margin: '6px 0 0 0' }}>NoteShare</h2>
         </div>
-        <form onSubmit={doAuth} style={{ padding: 18, display: 'grid', gap: 12 }}>
+
+        <form onSubmit={onSubmit} style={{ padding: 18, display: 'grid', gap: 12 }}>
           <label>
             <div className="kicker" style={{ marginBottom: 6 }}>Email</div>
-            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" />
+            <input
+              className="input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
           </label>
-          <label>
-            <div className="kicker" style={{ marginBottom: 6 }}>Password</div>
-            <input className="input" type="password" value={pass} onChange={(e) => setPass(e.target.value)} required placeholder="••••••••" />
-          </label>
-          {error && <div role="alert" aria-live="polite" style={{ color: 'var(--color-error)' }}>{error}</div>}
+
+          {mode !== 'reset' && (
+            <label>
+              <div className="kicker" style={{ marginBottom: 6 }}>Password</div>
+              <input
+                className="input"
+                type="password"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                required
+                placeholder="••••••••"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              />
+            </label>
+          )}
+
+          {mode === 'signup' && (
+            <label>
+              <div className="kicker" style={{ marginBottom: 6 }}>Confirm Password</div>
+              <input
+                className="input"
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                required
+                placeholder="••••••••"
+                autoComplete="new-password"
+              />
+            </label>
+          )}
+
+          {renderPasswordHelpers()}
+
+          {error && (
+            <div role="alert" aria-live="polite" style={{ color: 'var(--color-error)' }}>
+              {error}
+            </div>
+          )}
+          {!error && info && (
+            <div role="status" aria-live="polite" className="helper" style={{ color: 'green' }}>
+              {info}
+            </div>
+          )}
+
           <button className="btn btn-primary" disabled={busy} type="submit">
-            {busy ? 'Please wait…' : (mode === 'login' ? 'Log In' : 'Sign Up')}
+            {busy ? 'Please wait…' :
+              mode === 'login' ? 'Log In' :
+              mode === 'signup' ? 'Sign Up' : 'Send Reset Email'}
           </button>
-          <button type="button" className="btn" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
-            {mode === 'login' ? 'Need an account? Sign up' : 'Have an account? Log in'}
-          </button>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {mode !== 'login' && (
+              <button type="button" className="btn" onClick={() => switchMode('login')}>
+                Have an account? Log in
+              </button>
+            )}
+            {mode !== 'signup' && (
+              <button type="button" className="btn" onClick={() => switchMode('signup')}>
+                Need an account? Sign up
+              </button>
+            )}
+            {mode !== 'reset' && (
+              <button type="button" className="btn" onClick={() => switchMode('reset')}>
+                Forgot password?
+              </button>
+            )}
+          </div>
+
+          <div className="helper">
+            Tip: After signing up, we send a verification link. Ensure your Supabase Authentication URL settings include:
+            <br />
+            <code>{getURL()}</code>
+          </div>
         </form>
       </div>
     </main>

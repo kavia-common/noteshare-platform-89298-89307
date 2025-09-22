@@ -91,7 +91,7 @@ Notes:
 
 ## Authentication
 
-- Auth methods used: email/password with optional email verification flows
+- Auth methods used: email/password with email verification flows and password reset.
 - Signup uses a redirect back to the site. By default, the client uses window.location.origin; if REACT_APP_SITE_URL is set, it should match your Supabase Authentication URL settings.
 
 Configure Supabase Authentication URLs:
@@ -101,10 +101,12 @@ Configure Supabase Authentication URLs:
     * http://localhost:3000/**
     * https://your-production-domain/**
 - Ensure that the above URLs include the route /auth/callback because the app implements an AuthCallback page at that path to finalize the session.
+- Password reset emails also use the same redirect URL. After clicking the reset link, Supabase redirects to /auth/callback where the session is established and the user can set a new password (via Supabase UI flow or custom form if added).
 
 Relevant client routes:
-- /auth/callback — handled by src/pages/AuthCallback.jsx (uses supabase.auth.getSessionFromUrl to finalize login)
+- /auth/callback — handled by src/pages/AuthCallback.jsx (uses supabase.auth.getSessionFromUrl to finalize login or reset token)
 - /auth/error — friendly error page for auth-related issues
+- /login — combined login/signup/reset flows with validation and emails
 
 ## End-to-end Flow
 
