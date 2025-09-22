@@ -1,82 +1,52 @@
-# Lightweight React Template for KAVIA
+# NoteShare React Frontend
 
-This project provides a minimal React template with a clean, modern UI and minimal dependencies.
+A modern, responsive SPA for uploading, browsing, searching, previewing, and downloading notes/books in PDF format. Auth and storage are powered by Supabase.
 
 ## Features
+- Supabase Auth (email/password), Storage uploads
+- Browse notes in a responsive grid with search and category filters
+- Upload modal with metadata (title, description, author, category)
+- Preview PDFs via embedded iframe
+- Download via public URL
+- Profile page for basic user information
+- Ocean Professional theme (blue with amber accents), smooth shadows, rounded corners
 
-- **Lightweight**: No heavy UI frameworks - uses only vanilla CSS and React
-- **Modern UI**: Clean, responsive design with KAVIA brand styling
-- **Fast**: Minimal dependencies for quick loading times
-- **Simple**: Easy to understand and modify
-
-## Getting Started
-
-In the project directory, you can run:
-
-### `npm start`
-
-Runs the app in development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-### `npm test`
-
-Launches the test runner in interactive watch mode.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-## Customization
-
-### Colors
-
-The main brand colors are defined as CSS variables in `src/App.css`:
-
-```css
-:root {
-  --kavia-orange: #E87A41;
-  --kavia-dark: #1A1A1A;
-  --text-color: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --border-color: rgba(255, 255, 255, 0.1);
-}
+## Setup
+1) Install dependencies
+```
+npm install
 ```
 
-### Components
+2) Configure environment variables
+Create `.env` at `react_frontend/.env`:
+```
+REACT_APP_SUPABASE_URL=your_supabase_url
+REACT_APP_SUPABASE_KEY=your_supabase_anon_key
+```
 
-This template uses pure HTML/CSS components instead of a UI framework. You can find component styles in `src/App.css`. 
+3) Supabase configuration (required)
+- Create a public Storage bucket named `notes`
+- Create a table `notes` with columns:
+  - id: uuid primary key default uuid_generate_v4() (or gen_random_uuid())
+  - title: text
+  - description: text
+  - author: text
+  - category: text
+  - file_path: text
+  - file_size: bigint
+  - public_url: text
+  - created_at: timestamptz default now()
+- Enable RLS and add policies:
+  - Select: allow for all (or authenticated) as per your needs
+  - Insert: allow for authenticated users
+- Ensure Storage bucket is public or provide signed URL logic
 
-Common components include:
-- Buttons (`.btn`, `.btn-large`)
-- Container (`.container`)
-- Navigation (`.navbar`)
-- Typography (`.title`, `.subtitle`, `.description`)
+4) Run
+```
+npm start
+```
 
-## Learn More
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Notes
+- Signup uses emailRedirectTo = window.location.origin
+- All supabase credentials are read from env; do not hardcode secrets
+- Extend UI and data model as needed
