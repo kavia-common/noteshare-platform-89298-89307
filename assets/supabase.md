@@ -16,7 +16,8 @@ The Supabase client is initialized in src/lib/supabaseClient.js and reads the en
 
 - Bucket name: notes
 - Visibility: public (so that public_url can be embedded and downloaded directly)
-- Upload behavior: client uploads PDFs at the bucket root with a timestamp prefix
+- Upload behavior: client uploads PDFs under a user-scoped prefix with a timestamp:
+  - Path pattern: userId/yyyy/mm/<timestamp>_<originalname>.pdf
 - Public URLs: generated in the client via storage.getPublicUrl(path) and stored in the notes table
 
 Create the bucket:

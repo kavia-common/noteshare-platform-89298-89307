@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, requireAuthSession, getCurrentUser } from '../lib/supabaseClient';
 
 /**
  * UploadModal uploads a PDF file to Supabase Storage bucket "notes" and inserts
  * metadata into a "notes" table. It includes premium UI details and strong validation.
+ *
+ * Security and policy notes:
+ * - Requires an active Supabase auth session before upload.
+ * - Storage policy must allow inserts for authenticated users on bucket_id='notes'.
+ * - DB owner column defaults to auth.uid() to bind records to the uploader.
  */
 // PUBLIC_INTERFACE
 export default function UploadModal({ onClose, onUploaded }) {
@@ -51,17 +56,32 @@ export default function UploadModal({ onClose, onUploaded }) {
 
     setBusy(true);
     try {
+      // Ensure user is authenticated before any storage/db action
+      const session = await requireAuthSession();
+      const user = await getCurrentUser();
+      if (!session || !user) {
+        throw new Error('You must be logged in to upload files.');
+      }
+
       // Validate again right before upload
       const isPdfMime = file.type === 'application/pdf';
       const isPdfExt = /\.pdf$/i.test(file.name || '');
       if (!(isPdfMime || isPdfExt)) throw new Error('Only PDF files are allowed.');
       if (file.size > maxBytes) throw new Error(`File is too large. Maximum allowed is ${maxMb} MB.`);
 
-      // Prefix with date to reduce collisions; optionally add simple user-friendly pathing
-      const fileName = `${Date.now()}_${file.name}`;
+      // User-scoped path to avoid name collisions and to make object ownership auditable
+      // Path pattern: userId/yyyy/mm/<timestamp>_<sanitized-name>.pdf
+      const userId = user.id;
+      const dt = new Date();
+      const yyyy = dt.getFullYear();
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const baseName = (file.name || 'document.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const objectPath = `${userId}/${yyyy}/${mm}/${Date.now()}_${baseName}`;
+
+      // Upload to Storage
       const { data: up, error: upErr } = await supabase.storage
         .from('notes')
-        .upload(fileName, file, { contentType: 'application/pdf', upsert: false });
+        .upload(objectPath, file, { contentType: 'application/pdf', upsert: false });
       if (upErr) throw upErr;
 
       // Attempt to build a public URL. If the bucket is not public, this may be null/empty.
@@ -76,8 +96,8 @@ export default function UploadModal({ onClose, onUploaded }) {
         );
       }
 
-      // Insert DB row; owner defaults to auth.uid() by DB default
-      const { error: dbErr } = await supabase.from('notes').insert({
+      // Insert DB row; owner defaults to auth.uid() by DB default. We still provide file metadata.
+      const insertPayload = {
         title,
         description: desc,
         author,
@@ -85,11 +105,13 @@ export default function UploadModal({ onClose, onUploaded }) {
         file_path: up.path,
         file_size: file.size,
         public_url: publicUrl,
-      });
+        // owner is intentionally omitted to allow DB default auth.uid()
+      };
+
+      const { error: dbErr } = await supabase.from('notes').insert(insertPayload);
       if (dbErr) throw dbErr;
 
       setSuccess('Upload complete! Your note was added to the library.');
-      // Trigger dashboard refresh and close after a short delay to show success state
       onUploaded?.();
       setTimeout(() => {
         onClose?.();
@@ -99,8 +121,10 @@ export default function UploadModal({ onClose, onUploaded }) {
       const msg = raw.toLowerCase();
       let friendly = raw;
 
-      // Refined error classification
-      if (msg.includes('permission') || msg.includes('not authorized') || msg.includes('401') || msg.includes('403')) {
+      // Refined error classification including auth/session checks
+      if (msg.includes('must be logged in') || msg.includes('no current session')) {
+        friendly = 'Please sign in to upload notes. Log in and try again.';
+      } else if (msg.includes('permission') || msg.includes('not authorized') || msg.includes('401') || msg.includes('403')) {
         friendly = 'Upload unauthorized. Please log in and ensure a storage policy allows inserts to bucket "notes".';
       } else if (msg.includes('bucket') || msg.includes('not found') || msg.includes('object not found')) {
         friendly = 'Storage bucket "notes" not found. Create a public bucket named "notes" in Supabase Storage.';
