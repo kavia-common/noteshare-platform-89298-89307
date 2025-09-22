@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { getURL } from '../utils/getURL';
@@ -11,6 +11,7 @@ export default function AuthPage() {
    * - Clear error mapping for common Supabase errors
    * - Email verification guidance after signup
    * - Password reset flow
+   * - Explicit post-auth redirect and UX improvements
    */
   const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'reset'
   const [email, setEmail] = useState('');
@@ -20,6 +21,22 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const navigate = useNavigate();
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!active) return;
+      if (data?.session) navigate('/', { replace: true });
+    })();
+    return () => { active = false; };
+  }, [navigate]);
+
+  const emailLooksValid = useMemo(() => {
+    if (!email) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }, [email]);
 
   // Password policy: at least 8 chars, include a number and a letter
   const passIssues = useMemo(() => {
@@ -41,23 +58,29 @@ export default function AuthPage() {
     if (msg.includes('email') && msg.includes('not confirmed')) {
       return 'Email not confirmed. Please check your inbox for the verification link.';
     }
-    if (msg.includes('email') && msg.includes('already registered')) {
+    if (msg.includes('email') && (msg.includes('already') || msg.includes('registered'))) {
       return 'This email is already registered. Try logging in or use password reset.';
     }
-    if (msg.includes('rate limit')) {
+    if (msg.includes('rate limit') || msg.includes('too many')) {
       return 'Too many attempts. Please wait a moment and try again.';
     }
-    if (msg.includes('redirect') || msg.includes('url')) {
+    if (msg.includes('redirect') || msg.includes('url') || msg.includes('not allowed')) {
       return 'Redirect URL is not allowed. Open Troubleshoot and verify Authentication URL settings.';
     }
-    if (msg.includes('network') || msg.includes('fetch')) {
+    if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed to fetch')) {
       return 'Network error connecting to Supabase. Check your internet and Supabase URL.';
     }
-    if (msg.includes('apikey') || msg.includes('jwt') || msg.includes('secret')) {
+    if (msg.includes('apikey') || msg.includes('jwt') || msg.includes('secret') || msg.includes('invalid key')) {
       return 'Invalid Supabase key. Ensure REACT_APP_SUPABASE_KEY is the anon public key.';
     }
-    if (msg.includes('password') && msg.includes('too short')) {
-      return 'Password too short. Use at least 8 characters.';
+    if (msg.includes('password') && (msg.includes('too short') || msg.includes('weak'))) {
+      return 'Password too weak. Use at least 8 characters with letters and numbers.';
+    }
+    if (msg.includes('user not found')) {
+      return 'No account found for this email. Try signing up first.';
+    }
+    if (msg.includes('email rate limit exceeded')) {
+      return 'Email rate limit exceeded. Please try again later.';
     }
     return raw;
   };
@@ -73,13 +96,22 @@ export default function AuthPage() {
   const doLogin = async () => {
     const { error: err } = await supabase.auth.signInWithPassword({ email, password: pass });
     if (err) throw err;
+
+    // After successful login, redirect explicitly
+    const { data } = await supabase.auth.getSession();
+    if (data?.session) {
+      navigate('/', { replace: true });
+    }
   };
 
   const doSignup = async () => {
+    if (!emailLooksValid) {
+      throw new Error('Please enter a valid email address.');
+    }
     if (passIssues.length > 0) {
       throw new Error('Password does not meet requirements.');
     }
-    const redirectTo = getURL();
+    const redirectTo = getURL(); // Must be allowed in Supabase URL settings
     const { data, error: err } = await supabase.auth.signUp({
       email,
       password: pass,
@@ -88,13 +120,20 @@ export default function AuthPage() {
       }
     });
     if (err) throw err;
+
     // On many configs, session is null until email verified:
     if (!data?.session) {
       setInfo('Signup successful. Please check your email and click the verification link to complete sign-in.');
+    } else {
+      // In case auto-confirm is enabled in the project
+      navigate('/', { replace: true });
     }
   };
 
   const doReset = async () => {
+    if (!emailLooksValid) {
+      throw new Error('Please enter a valid email address.');
+    }
     // Send password reset email
     const redirectTo = getURL();
     const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
@@ -112,10 +151,9 @@ export default function AuthPage() {
     try {
       if (mode === 'login') {
         await doLogin();
-        navigate('/');
       } else if (mode === 'signup') {
         await doSignup();
-        // Stay on page to show verification info; do not redirect immediately
+        // Stay on page to show verification info if session not present
       } else if (mode === 'reset') {
         await doReset();
       }
@@ -164,6 +202,7 @@ export default function AuthPage() {
               required
               placeholder="you@example.com"
               autoComplete="email"
+              aria-invalid={email.length > 0 && !emailLooksValid}
             />
           </label>
 
@@ -210,7 +249,7 @@ export default function AuthPage() {
             </div>
           )}
 
-          <button className="btn btn-primary" disabled={busy} type="submit">
+          <button className="btn btn-primary" disabled={busy || (mode !== 'reset' && !emailLooksValid)} type="submit">
             {busy ? 'Please wait…' :
               mode === 'login' ? 'Log In' :
               mode === 'signup' ? 'Sign Up' : 'Send Reset Email'}

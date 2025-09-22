@@ -144,6 +144,7 @@ export default function Troubleshoot() {
           <div className="helper" style={{ marginTop: 6 }}>
             Runs checks for common causes of "invalid credentials" and upload failures. 
             Refer to <Link to="/auth/error">Auth Error Help</Link> and assets/supabase.md for fixes.
+            Ensure your Authentication URL settings include your Site URL and allow redirect to <code>/auth/callback</code>.
           </div>
         </div>
         <div style={{ padding: 18, display: 'grid', gap: 12 }}>

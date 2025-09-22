@@ -30,5 +30,5 @@ export default function AuthCallback() {
     handle();
   }, [navigate]);
 
-  return <main className="container"><div className="helper">Processing authentication…</div></main>;
+  return <main className="container"><div className="helper">Processing authentication… You will be redirected shortly.</div></main>;
 }
