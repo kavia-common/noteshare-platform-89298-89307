@@ -16,6 +16,9 @@ export default function AppRouter() {
   const [session, setSession] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
 
+  // State used to trigger Dashboard re-fetch
+  const [refreshKey, setRefreshKey] = useState(0);
+
   useEffect(() => {
     // Initialize session on mount
     supabase.auth.getSession().then(({ data }) => setSession(data.session || null));
@@ -24,6 +27,13 @@ export default function AppRouter() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Callback to be invoked after a successful upload to refresh dashboard
+  const handleUploaded = () => {
+    // bump the key to trigger Dashboard useEffect
+    setRefreshKey((k) => k + 1);
+    setShowUpload(false);
+  };
+
   return (
     <BrowserRouter>
       <Navbar
@@ -31,7 +41,16 @@ export default function AppRouter() {
         onUpload={() => setShowUpload(true)}
       />
       <Routes>
-        <Route path="/" element={<Dashboard session={session} onUpload={() => setShowUpload(true)} />} />
+        <Route
+          path="/"
+          element={
+            <Dashboard
+              session={session}
+              onUpload={() => setShowUpload(true)}
+              refreshKey={refreshKey}
+            />
+          }
+        />
         <Route path="/login" element={session ? <Navigate to="/" replace /> : <AuthPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/auth/error" element={<AuthError />} />
@@ -40,7 +59,7 @@ export default function AppRouter() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {showUpload && (
-        <UploadModal onClose={() => setShowUpload(false)} />
+        <UploadModal onClose={() => setShowUpload(false)} onUploaded={handleUploaded} />
       )}
       <button className="fab" aria-label="Upload PDF" onClick={() => setShowUpload(true)}>
         ⬆
