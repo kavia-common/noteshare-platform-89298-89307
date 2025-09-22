@@ -51,7 +51,7 @@ export default function Navbar({ session, onUpload }) {
   return (
     <div className="navbar" role="navigation" aria-label="Primary">
       <div className="nav-inner">
-        <Link to="/" className="brand" aria-label="NoteShare Home">
+        <Link to="/" className="brand" aria-label="NoteShare Home" style={{ textDecoration: 'none' }}>
           <div className="brand-mark" aria-hidden="true">📘</div>
           <span>NoteShare</span>
         </Link>
