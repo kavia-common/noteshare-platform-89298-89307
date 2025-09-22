@@ -98,16 +98,50 @@ Notes:
 Configure Supabase Authentication URLs:
 - Go to Authentication > URL Configuration
   - Site URL: set to your dev/prod site (e.g., http://localhost:3000 or https://your-domain)
-  - Redirect URLs:
+  - Redirect URLs (add all that apply; include wildcard to allow nested routes):
     * "http://localhost:3000/**"
-    * "https://vscode-internal-29843-beta.beta01.cloud.kavia.ai:4000/**"
-- Ensure that the above URLs include the route "/auth/callback" because the app implements an AuthCallback page at that path to finalize the session.
-- Password reset emails also use the same redirect URL. After clicking the reset link, Supabase redirects to "/auth/callback" where the session is established and the user can set a new password (via Supabase UI flow or custom form if added).
+    * "https://vscode-internal-29843-beta.beta01.cloud.kavia.ai:3000/**"  ← adjust to your actual preview/prod origin and port
+- Ensure the route "/auth/callback" is permitted by the wildcard in Redirect URLs. The app finalizes sessions at this path.
+
+Email sending and SMTP configuration (improves deliverability):
+1) In Supabase Dashboard > Authentication > Providers > Email
+   - Verify Email provider is enabled.
+   - Optional but recommended: Configure a Custom SMTP provider (e.g., SendGrid, Postmark, AWS SES) for reliable delivery.
+   - Set the “Sender email” to a verified address at your domain (e.g., no-reply@yourdomain.com).
+   - In your SMTP provider, set up and verify SPF and DKIM DNS records. Consider adding a DMARC record for better inbox placement.
+   - Save changes and send a test email.
+
+2) In Supabase Dashboard > Authentication > URL Configuration
+   - Ensure Site URL exactly matches REACT_APP_SITE_URL (if set), including scheme (https) and no trailing path beyond root.
+   - Add Redirect URLs with wildcards to cover "/auth/callback" and any nested routes you might use in the future.
+
+3) Logs and monitoring
+   - Check Authentication > Logs for “Email” events and errors (rate limit exceeded, SMTP rejected, invalid recipient).
+   - If emails are not sent, verify your project isn’t rate-limited and that the sender is not blocked by your SMTP provider.
+   - Check https://status.supabase.com for incidents impacting email.
+
+4) Spam and allowlisting
+   - Ask recipients to check their spam/junk folder.
+   - Recommend adding the sender address to their contacts/allowlist.
+   - Use a recognizable “From name” (e.g., “NoteShare”) to reduce confusion.
+
+5) Redirect & link validation
+   - The app sets `emailRedirectTo` using REACT_APP_SITE_URL if defined, otherwise `window.location.origin`.
+   - Make sure that this exact origin is included in Supabase “Site URL” and “Redirect URLs.”
+   - Ensure the Auth callback route exists and is reachable at “/auth/callback”.
+   - If you change domains, update both the environment variable and Supabase Auth URLs.
 
 Relevant client routes:
 - /auth/callback — handled by src/pages/AuthCallback.jsx (uses supabase.auth.getSessionFromUrl to finalize login or reset token)
 - /auth/error — friendly error page for auth-related issues
 - /login — combined login/signup/reset flows with validation and emails
+
+Email Templates:
+- In Authentication > Templates, customize:
+  - Confirm signup
+  - Magic link / OTP
+  - Reset password
+- Ensure links use the correct {{ .RedirectTo }} or default template variables. Keep branding clear to reduce spam filtering.
 
 ## End-to-end Flow
 
@@ -118,14 +152,44 @@ Relevant client routes:
 
 ## Troubleshooting
 
-- One-click checks: Open the in-app Diagnostics at /troubleshoot. It validates env variables (REACT_APP_SUPABASE_URL/KEY), Supabase connectivity, auth redirect URL, and storage bucket access with actionable fixes.
-- If uploads fail with 401/403: Verify that the user is authenticated and the storage insert policy allowing authenticated users for bucket_id = 'notes' is in place.
-- If preview/download fails or shows an unavailable message:
-  - Ensure the bucket is public and that getPublicUrl returns a valid URL.
-  - Confirm that public_url is stored in the notes row.
-- If signup or login does not redirect back:
-  - Check Authentication > URL Configuration to include your site and redirect patterns.
-  - If you set REACT_APP_SITE_URL, ensure it matches your Supabase site/redirect settings exactly (scheme, domain, and trailing slash).
-- If you encounter 'ERROR: 42710: policy ... already exists' when running SQL:
-  - This occurs if you run CREATE POLICY for a policy that is already present. If you do not need to change the rule, you can safely ignore this error.
-  - If you need to change the policy definition, either use CREATE OR REPLACE POLICY where applicable, or drop the existing policy first using DROP POLICY and then recreate it with the new definition.
+- One-click checks: Open the in-app Diagnostics at /troubleshoot. It validates env variables (REACT_APP_SUPABASE_URL/KEY), the effective auth redirect URL, Supabase connectivity, and storage bucket access with actionable fixes.
+
+Auth email not delivered (verification/magic link/reset):
+1) Verify Auth URLs
+   - Authentication > URL Configuration: Site URL matches your current origin.
+   - Redirect URLs include the exact origin with wildcard, e.g.:
+     - http://localhost:3000/**
+     - https://your-domain/**
+   - Ensure /auth/callback is handled (route exists in the app).
+
+2) Check Email templates
+   - Authentication > Templates: Ensure “Confirm signup” and other templates are enabled and contain default placeholders correctly.
+   - If customized, ensure the button “Confirm your email” references the correct redirect.
+
+3) Configure Custom SMTP (recommended)
+   - Authentication > Providers > Email: Set your SMTP host, port, username, password, and From address (verified).
+   - Verify your sending domain (SPF/DKIM) with your SMTP provider.
+   - Send a test email from Supabase.
+
+4) Inspect logs and status
+   - Authentication > Logs: Filter for Email to see bounces/errors/rate limits.
+   - Check https://status.supabase.com for any ongoing issues.
+
+5) Spam and allowlist
+   - Ask the user to check spam/junk.
+   - Add the sender to contacts/allowlist.
+
+6) Environment consistency
+   - If REACT_APP_SITE_URL is set, it must match Auth Site URL and be included in Redirect URLs.
+   - For preview URLs that change, either update Redirect URLs or rely on localhost during dev.
+
+7) Rate limits
+   - Avoid rapid repeated signups/resets; Supabase applies email rate limits. Try again later if rate limited.
+
+Other issues:
+- If uploads fail with 401/403: Verify user is signed in and storage insert policy for bucket 'notes' exists.
+- If preview/download fails: Ensure public bucket and that getPublicUrl returns a valid URL and is stored in notes.public_url.
+
+If you encounter 'ERROR: 42710: policy ... already exists' when running SQL:
+- This occurs if you run CREATE POLICY for a policy that is already present. If you do not need to change the rule, you can safely ignore this error.
+- If you need to change the policy definition, either use CREATE OR REPLACE POLICY where applicable, or drop the existing policy first using DROP POLICY and then recreate it with the new definition.

@@ -109,16 +109,23 @@ export default function Troubleshoot() {
       add({
         title: 'Auth redirect URL',
         ok: Boolean(siteUrl && siteUrl.startsWith('http')),
-        detail: `Using ${siteUrl} (from REACT_APP_SITE_URL or window.location.origin)`,
+        detail: `Using ${siteUrl} (from REACT_APP_SITE_URL or window.location.origin). Expected callback: ${new URL(siteUrl).origin}/auth/callback`,
         fix: 'In Supabase > Authentication > URL Configuration set Site URL to this value and include redirect URL patterns (e.g., http://localhost:3000/**).',
+      });
+
+      // Email deliverability guidance
+      add({
+        title: 'Email deliverability configuration',
+        ok: false,
+        detail: 'If verification/reset emails are not received, configure custom SMTP with a verified sender and domain (SPF/DKIM).',
+        fix: 'Supabase > Auth > Providers > Email: add SMTP host/port/user/pass and no-reply@yourdomain.com; verify SPF/DKIM with your DNS; check Auth > Logs for email errors; confirm templates enabled.',
       });
 
       // Storage checks: try to create a public URL for a fake path; also list bucket to infer existence
       try {
         const bucket = 'notes';
-        // getPublicUrl for a fake path will not fail—just returns a URL pattern; used to show base URL.
         const { data: pub } = supabase.storage.from(bucket).getPublicUrl('example.pdf');
-        // Attempt to list first object to check permission/bucket existence (will likely return 404 -> error.message includes 'No such file or directory' or similar)
+        // Attempt to list first object to check permission/bucket existence
         const { data: listData, error: listErr } = await supabase.storage.from(bucket).list('', { limit: 1 });
         const ok = !listErr || (listErr?.message || '').toLowerCase().includes('not found') || Array.isArray(listData);
 
@@ -152,8 +159,8 @@ export default function Troubleshoot() {
           <div className="kicker">Diagnostics</div>
           <h2 style={{ margin: '6px 0 0 0' }}>Supabase Troubleshooter</h2>
           <div className="helper" style={{ marginTop: 6 }}>
-            Runs checks for common causes of "invalid credentials" and upload failures. 
-            Refer to <Link to="/auth/error">Auth Error Help</Link> and assets/supabase.md for fixes.
+            Runs checks for common causes of email, redirect, and upload issues. 
+            Refer to <Link to="/auth/error">Auth Error Help</Link> and assets/supabase.md for step-by-step fixes.
             Ensure your Authentication URL settings include your Site URL and allow redirect to <code>/auth/callback</code>.
           </div>
         </div>
