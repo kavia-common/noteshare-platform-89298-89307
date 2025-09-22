@@ -14,6 +14,7 @@ export default function UploadModal({ onClose, onUploaded }) {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
 
   const maxMb = Number(process.env.REACT_APP_MAX_UPLOAD_MB || 50);
   const maxBytes = Number.isFinite(maxMb) && maxMb > 0 ? maxMb * 1024 * 1024 : 50 * 1024 * 1024;
@@ -22,6 +23,7 @@ export default function UploadModal({ onClose, onUploaded }) {
     const f = e.target.files?.[0] || null;
     setFile(f);
     setError('');
+    setWarning('');
     if (!f) return;
 
     const isPdfMime = f.type === 'application/pdf';
@@ -40,24 +42,36 @@ export default function UploadModal({ onClose, onUploaded }) {
   const doUpload = async (e) => {
     e.preventDefault();
     setError('');
+    setWarning('');
     if (!file) return setError('Please select a PDF to upload.');
     if (!title.trim()) return setError('Title is required.');
 
     setBusy(true);
     try {
+      // Validate again right before upload
       const isPdfMime = file.type === 'application/pdf';
       const isPdfExt = /\.pdf$/i.test(file.name || '');
       if (!(isPdfMime || isPdfExt)) throw new Error('Only PDF files are allowed.');
       if (file.size > maxBytes) throw new Error(`File is too large. Maximum allowed is ${maxMb} MB.`);
 
+      // Prefix with date to reduce collisions; optionally add simple user-friendly pathing
       const fileName = `${Date.now()}_${file.name}`;
       const { data: up, error: upErr } = await supabase.storage
         .from('notes')
         .upload(fileName, file, { contentType: 'application/pdf', upsert: false });
       if (upErr) throw upErr;
 
+      // Attempt to build a public URL. If the bucket is not public, this may be null/empty.
       const { data: pub } = supabase.storage.from('notes').getPublicUrl(up.path);
-      const publicUrl = pub?.publicUrl;
+      const publicUrl = pub?.publicUrl || null;
+
+      if (!publicUrl) {
+        // Provide user-facing guidance; still insert row so dashboard can show it and preview page can guide further.
+        setWarning(
+          'Upload succeeded, but preview URL is not public. ' +
+          'Ensure the "notes" bucket is public or switch to signed URLs.'
+        );
+      }
 
       const { error: dbErr } = await supabase.from('notes').insert({
         title,
@@ -134,6 +148,11 @@ export default function UploadModal({ onClose, onUploaded }) {
           {error && (
             <div role="alert" aria-live="polite" style={{ color: 'var(--color-error)' }}>
               {error}
+            </div>
+          )}
+          {!error && warning && (
+            <div role="status" aria-live="polite" className="helper" style={{ color: '#92400E' }}>
+              {warning}
             </div>
           )}
 
