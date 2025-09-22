@@ -122,6 +122,9 @@ export default function Navbar({ session, onUpload }) {
         </div>
 
         <div className="nav-spacer" />
+        <Link className="btn" to="/troubleshoot" aria-label="Open Supabase diagnostics" title="Troubleshoot">
+          Troubleshoot
+        </Link>
 
         <button
           className="btn btn-primary"

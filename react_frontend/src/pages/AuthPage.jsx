@@ -36,7 +36,22 @@ export default function AuthPage() {
         navigate('/');
       }
     } catch (err) {
-      setError(err.message || 'Authentication failed.');
+      const msg = (err?.message || '').toLowerCase();
+      let friendly = err?.message || 'Authentication failed.';
+      if (msg.includes('invalid login credentials')) {
+        friendly = 'Invalid email or password. Please try again.';
+      } else if (msg.includes('email') && msg.includes('not confirmed')) {
+        friendly = 'Email not confirmed. Please check your inbox for the verification link.';
+      } else if (msg.includes('rate limit')) {
+        friendly = 'Too many attempts. Please wait a moment and try again.';
+      } else if (msg.includes('redirect') || msg.includes('url')) {
+        friendly = 'Redirect URL is not allowed. Open Troubleshoot and verify Authentication URL settings.';
+      } else if (msg.includes('network') || msg.includes('fetch')) {
+        friendly = 'Network error connecting to Supabase. Check your internet and Supabase URL.';
+      } else if (msg.includes('apikey') || msg.includes('jwt') || msg.includes('secret')) {
+        friendly = 'Invalid Supabase key. Ensure REACT_APP_SUPABASE_KEY is the anon public key.';
+      }
+      setError(friendly + ' (See Troubleshoot for help)');
     } finally {
       setBusy(false);
     }

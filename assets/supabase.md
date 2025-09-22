@@ -115,6 +115,7 @@ Relevant client routes:
 
 ## Troubleshooting
 
+- One-click checks: Open the in-app Diagnostics at /troubleshoot. It validates env variables (REACT_APP_SUPABASE_URL/KEY), Supabase connectivity, auth redirect URL, and storage bucket access with actionable fixes.
 - If uploads fail with 401/403: Verify that the user is authenticated and the storage insert policy allowing authenticated users for bucket_id = 'notes' is in place.
 - If preview/download fails or shows an unavailable message:
   - Ensure the bucket is public and that getPublicUrl returns a valid URL.

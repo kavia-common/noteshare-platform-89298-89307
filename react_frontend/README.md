@@ -95,6 +95,7 @@ REACT_APP_MAX_UPLOAD_MB=50
     using (auth.uid() = owner);
     ```
 - Authentication URL settings
+  - Tip: Use the in-app Troubleshooter at /troubleshoot to verify env variables, URL config, and storage access.
   - In Supabase Dashboard > Authentication > URL Configuration:
     - Site URL: http://localhost:3000 (for local dev) and your production URL
     - Redirect URLs:

@@ -87,7 +87,21 @@ export default function UploadModal({ onClose, onUploaded }) {
       onUploaded?.();
       onClose?.();
     } catch (err) {
-      setError(err.message || 'Upload failed.');
+      const raw = err?.message || 'Upload failed.';
+      const msg = raw.toLowerCase();
+      let friendly = raw;
+      if (msg.includes('permission') || msg.includes('not authorized') || msg.includes('401') || msg.includes('403')) {
+        friendly = 'Upload unauthorized. Please log in and ensure a storage policy allows inserts to bucket "notes".';
+      } else if (msg.includes('bucket') || msg.includes('not found')) {
+        friendly = 'Storage bucket "notes" not found. Create a public bucket named "notes" in Supabase Storage.';
+      } else if (msg.includes('network') || msg.includes('fetch')) {
+        friendly = 'Network error during upload. Check your connection and Supabase URL.';
+      } else if (msg.includes('conflict')) {
+        friendly = 'A file with this name already exists. Please try again (we use a timestamp prefix to avoid collisions).';
+      } else if (msg.includes('row level security') || msg.includes('rls')) {
+        friendly = 'Database insert blocked by RLS. Add the "Allow insert for authenticated users" policy for public.notes.';
+      }
+      setError(friendly + ' (See Troubleshoot for help)');
     } finally {
       setBusy(false);
     }
@@ -147,7 +161,7 @@ export default function UploadModal({ onClose, onUploaded }) {
 
           {error && (
             <div role="alert" aria-live="polite" style={{ color: 'var(--color-error)' }}>
-              {error}
+              {error} <a className="btn" href="/troubleshoot" style={{ marginLeft: 8 }}>Troubleshoot</a>
             </div>
           )}
           {!error && warning && (

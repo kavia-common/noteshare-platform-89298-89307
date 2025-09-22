@@ -9,6 +9,7 @@ import ProfilePage from './pages/ProfilePage';
 import UploadModal from './components/UploadModal';
 import AuthCallback from './pages/AuthCallback';
 import AuthError from './pages/AuthError';
+import Troubleshoot from './pages/Troubleshoot';
 
 // PUBLIC_INTERFACE
 export default function AppRouter() {
@@ -37,6 +38,7 @@ export default function AppRouter() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/auth/error" element={<AuthError />} />
         <Route path="/preview/:id" element={<PreviewPage />} />
+        <Route path="/troubleshoot" element={<Troubleshoot />} />
         <Route path="/profile" element={session ? <ProfilePage /> : <Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
