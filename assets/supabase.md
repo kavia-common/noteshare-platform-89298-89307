@@ -99,10 +99,10 @@ Configure Supabase Authentication URLs:
 - Go to Authentication > URL Configuration
   - Site URL: set to your dev/prod site (e.g., http://localhost:3000 or https://your-domain)
   - Redirect URLs:
-    * http://localhost:3000/**
-    * https://your-production-domain/**
-- Ensure that the above URLs include the route /auth/callback because the app implements an AuthCallback page at that path to finalize the session.
-- Password reset emails also use the same redirect URL. After clicking the reset link, Supabase redirects to /auth/callback where the session is established and the user can set a new password (via Supabase UI flow or custom form if added).
+    * "http://localhost:3000/**"
+    * "https://vscode-internal-29843-beta.beta01.cloud.kavia.ai:4000/**"
+- Ensure that the above URLs include the route "/auth/callback" because the app implements an AuthCallback page at that path to finalize the session.
+- Password reset emails also use the same redirect URL. After clicking the reset link, Supabase redirects to "/auth/callback" where the session is established and the user can set a new password (via Supabase UI flow or custom form if added).
 
 Relevant client routes:
 - /auth/callback — handled by src/pages/AuthCallback.jsx (uses supabase.auth.getSessionFromUrl to finalize login or reset token)
@@ -126,3 +126,6 @@ Relevant client routes:
 - If signup or login does not redirect back:
   - Check Authentication > URL Configuration to include your site and redirect patterns.
   - If you set REACT_APP_SITE_URL, ensure it matches your Supabase site/redirect settings exactly (scheme, domain, and trailing slash).
+- If you encounter 'ERROR: 42710: policy ... already exists' when running SQL:
+  - This occurs if you run CREATE POLICY for a policy that is already present. If you do not need to change the rule, you can safely ignore this error.
+  - If you need to change the policy definition, either use CREATE OR REPLACE POLICY where applicable, or drop the existing policy first using DROP POLICY and then recreate it with the new definition.

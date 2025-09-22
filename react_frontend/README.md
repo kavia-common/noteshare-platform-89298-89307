@@ -99,8 +99,8 @@ REACT_APP_MAX_UPLOAD_MB=50
   - In Supabase Dashboard > Authentication > URL Configuration:
     - Site URL: http://localhost:3000 (for local dev) and your production URL
     - Redirect URLs:
-      - http://localhost:3000/**
-      - https://your-production-domain/**
+      - "http://localhost:3000/**"
+      - "https://vscode-internal-29843-beta.beta01.cloud.kavia.ai:4000/**"
   - This app handles the callback at `/auth/callback`. Ensure your redirect patterns allow that path.
 
 4) Run the app
@@ -119,3 +119,8 @@ npm start
 - Signup uses `emailRedirectTo = window.location.origin` by default. If you configure `REACT_APP_SITE_URL`, it should align with Supabase Authentication settings.
 - All Supabase credentials are read from env; do not hardcode secrets.
 - If you prefer private storage, disable public bucket and switch the app to use signed URLs for preview/download and adjust RLS accordingly.
+
+## Troubleshooting note (Supabase SQL policies)
+If you see `ERROR: 42710: policy ... already exists` when running the SQL for policies, it means the policy has already been created. This is not a problem unless you need to change the rule. In that case, either:
+- Use `CREATE OR REPLACE POLICY` where applicable, or
+- Drop the existing policy first with `DROP POLICY` and then create it again with the new definition.
