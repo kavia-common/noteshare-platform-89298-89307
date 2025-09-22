@@ -15,6 +15,7 @@ export default function UploadModal({ onClose, onUploaded }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
+  const [success, setSuccess] = useState('');
 
   const maxMb = Number(process.env.REACT_APP_MAX_UPLOAD_MB || 50);
   const maxBytes = Number.isFinite(maxMb) && maxMb > 0 ? maxMb * 1024 * 1024 : 50 * 1024 * 1024;
@@ -24,6 +25,7 @@ export default function UploadModal({ onClose, onUploaded }) {
     setFile(f);
     setError('');
     setWarning('');
+    setSuccess('');
     if (!f) return;
 
     const isPdfMime = f.type === 'application/pdf';
@@ -43,6 +45,7 @@ export default function UploadModal({ onClose, onUploaded }) {
     e.preventDefault();
     setError('');
     setWarning('');
+    setSuccess('');
     if (!file) return setError('Please select a PDF to upload.');
     if (!title.trim()) return setError('Title is required.');
 
@@ -73,6 +76,7 @@ export default function UploadModal({ onClose, onUploaded }) {
         );
       }
 
+      // Insert DB row; owner defaults to auth.uid() by DB default
       const { error: dbErr } = await supabase.from('notes').insert({
         title,
         description: desc,
@@ -84,22 +88,30 @@ export default function UploadModal({ onClose, onUploaded }) {
       });
       if (dbErr) throw dbErr;
 
+      setSuccess('Upload complete! Your note was added to the library.');
+      // Trigger dashboard refresh and close after a short delay to show success state
       onUploaded?.();
-      onClose?.();
+      setTimeout(() => {
+        onClose?.();
+      }, 500);
     } catch (err) {
       const raw = err?.message || 'Upload failed.';
       const msg = raw.toLowerCase();
       let friendly = raw;
+
+      // Refined error classification
       if (msg.includes('permission') || msg.includes('not authorized') || msg.includes('401') || msg.includes('403')) {
         friendly = 'Upload unauthorized. Please log in and ensure a storage policy allows inserts to bucket "notes".';
-      } else if (msg.includes('bucket') || msg.includes('not found')) {
+      } else if (msg.includes('bucket') || msg.includes('not found') || msg.includes('object not found')) {
         friendly = 'Storage bucket "notes" not found. Create a public bucket named "notes" in Supabase Storage.';
-      } else if (msg.includes('network') || msg.includes('fetch')) {
+      } else if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed to fetch')) {
         friendly = 'Network error during upload. Check your connection and Supabase URL.';
       } else if (msg.includes('conflict')) {
         friendly = 'A file with this name already exists. Please try again (we use a timestamp prefix to avoid collisions).';
-      } else if (msg.includes('row level security') || msg.includes('rls')) {
-        friendly = 'Database insert blocked by RLS. Add the "Allow insert for authenticated users" policy for public.notes.';
+      } else if (msg.includes('row level security') || msg.includes('rls') || msg.includes('violates row-level security policy')) {
+        friendly = 'Database insert blocked by RLS. Ensure the "Allow insert for authenticated users" policy for public.notes is active.';
+      } else if (msg.includes('new row violates row-level security policy')) {
+        friendly = 'RLS prevented the insert. Make sure owner defaults to auth.uid() and the insert policy allows authenticated users.';
       }
       setError(friendly + ' (See Troubleshoot for help)');
     } finally {
@@ -117,24 +129,24 @@ export default function UploadModal({ onClose, onUploaded }) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between'
         }}>
           <div className="kicker">Upload</div>
-          <button className="btn" onClick={onClose} title="Close">✕</button>
+          <button className="btn" onClick={onClose} title="Close" disabled={busy}>✕</button>
         </div>
         <form onSubmit={doUpload} style={{ padding: 18, display: 'grid', gap: 12 }}>
           <label>
             <div className="kicker" style={{ marginBottom: 6 }}>Title</div>
-            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g., Linear Algebra Notes" />
+            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g., Linear Algebra Notes" disabled={busy} />
           </label>
           <label>
             <div className="kicker" style={{ marginBottom: 6 }}>Description</div>
-            <textarea className="textarea" value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Brief summary, topics covered, or helpful notes…" />
+            <textarea className="textarea" value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Brief summary, topics covered, or helpful notes…" disabled={busy} />
           </label>
           <label>
             <div className="kicker" style={{ marginBottom: 6 }}>Author</div>
-            <input className="input" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Your name or source" />
+            <input className="input" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Your name or source" disabled={busy} />
           </label>
           <label>
             <div className="kicker" style={{ marginBottom: 6 }}>Category</div>
-            <select className="select" value={category} onChange={(e) => setCategory(e.target.value)}>
+            <select className="select" value={category} onChange={(e) => setCategory(e.target.value)} disabled={busy}>
               <option value="math">Mathematics</option>
               <option value="cs">Computer Science</option>
               <option value="physics">Physics</option>
@@ -153,6 +165,7 @@ export default function UploadModal({ onClose, onUploaded }) {
               onChange={handleFileChange}
               required
               aria-describedby="file-help"
+              disabled={busy}
             />
             <div id="file-help" className="helper">
               Only PDF files are allowed. Max size: {maxMb} MB.
@@ -169,9 +182,14 @@ export default function UploadModal({ onClose, onUploaded }) {
               {warning}
             </div>
           )}
+          {!error && success && (
+            <div role="status" aria-live="polite" className="helper" style={{ color: 'green' }}>
+              {success}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
+            <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
             <button disabled={busy} className="btn btn-primary" type="submit">{busy ? 'Uploading…' : 'Upload'}</button>
           </div>
         </form>
