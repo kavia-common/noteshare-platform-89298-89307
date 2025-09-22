@@ -71,6 +71,16 @@ export default function Troubleshoot() {
           fix: 'Use anon public key from Project Settings > API (do not use service_role key).',
         });
 
+        // Extra: is a user session established?
+        const hasSession = Boolean(data?.session);
+        const uid = data?.session?.user?.id || null;
+        add({
+          title: 'Authenticated session present',
+          ok: hasSession,
+          detail: hasSession ? `User ID: ${uid}` : 'No session at this time — uploads will fail RLS',
+          fix: 'Log in, ensure /auth/callback runs, and that this page shows an authenticated user before uploading.'
+        });
+
         // Attempt to fetch from a public table (notes) to see if DB is reachable (will succeed or show RLS errors)
         const { data: notesData, error: notesErr } = await supabase
           .from('notes')

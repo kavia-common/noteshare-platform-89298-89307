@@ -90,11 +90,35 @@ export default function UploadModal({ onClose, onUploaded }) {
     setBusy(true);
     try {
       // Ensure user is authenticated before any storage/db action (double check with throwing method)
+      // Add explicit diagnostics for session and user; helpful for RLS triage
+      const { data: preData, error: preErr } = await supabase.auth.getSession();
+      // eslint-disable-next-line no-console
+      console.log('[UploadModal] pre-insert getSession()', {
+        hasError: Boolean(preErr),
+        error: preErr?.message,
+        hasSession: Boolean(preData?.session),
+        userId: preData?.session?.user?.id || null,
+        accessTokenPresent: Boolean(preData?.session?.access_token),
+      });
+
       const session = await requireAuthSession();
       const user = await getCurrentUser();
       if (!session || !user) {
         throw new Error('You must be logged in to upload files.');
       }
+
+      // Extra runtime context diagnostics (domain/iframe/cookies)
+      try {
+        const sameOrigin = window.location.origin;
+        const inIframe = window.self !== window.top;
+        // eslint-disable-next-line no-console
+        console.log('[UploadModal] runtime context', {
+          origin: sameOrigin,
+          inIframe,
+          cookieEnabled: navigator.cookieEnabled,
+          userAgent: navigator.userAgent,
+        });
+      } catch { /* ignore */ }
 
       // Validate again right before upload
       const isPdfMime = file.type === 'application/pdf';
@@ -142,8 +166,36 @@ export default function UploadModal({ onClose, onUploaded }) {
         // owner is intentionally omitted to allow DB default auth.uid()
       };
 
+      // Diagnostic: Ensure no owner is included and log payload keys
+      // eslint-disable-next-line no-console
+      console.log('[UploadModal] about to insert notes row', {
+        userId,
+        sendingOwnerColumn: Object.prototype.hasOwnProperty.call(insertPayload, 'owner'),
+        payloadKeys: Object.keys(insertPayload),
+        payloadPreview: {
+          title: insertPayload.title,
+          category: insertPayload.category,
+          file_path: insertPayload.file_path,
+          file_size: insertPayload.file_size,
+          public_url: Boolean(insertPayload.public_url),
+        }
+      });
+
+      // Also log current session again just before insert to ensure token forwarding
+      const { data: preInsertSession } = await supabase.auth.getSession();
+      // eslint-disable-next-line no-console
+      console.log('[UploadModal] session before insert', {
+        hasSession: Boolean(preInsertSession?.session),
+        userId: preInsertSession?.session?.user?.id || null,
+        accessTokenPresent: Boolean(preInsertSession?.session?.access_token),
+      });
+
       const { error: dbErr } = await supabase.from('notes').insert(insertPayload);
-      if (dbErr) throw dbErr;
+      if (dbErr) {
+        // eslint-disable-next-line no-console
+        console.error('[UploadModal] DB insert error', dbErr);
+        throw dbErr;
+      }
 
       setSuccess('Upload complete! Your note was added to the library.');
       onUploaded?.();
@@ -170,6 +222,12 @@ export default function UploadModal({ onClose, onUploaded }) {
         friendly = 'Database insert blocked by RLS. Ensure you are signed in, the owner column defaults to auth.uid(), and the "Allow insert for authenticated users" policy is present.';
       }
       setError(friendly + ' (See Troubleshoot for help)');
+
+      // eslint-disable-next-line no-console
+      console.error('[UploadModal] Upload failure diagnostics', {
+        rawError: err,
+        message: err?.message,
+      });
     } finally {
       setBusy(false);
     }

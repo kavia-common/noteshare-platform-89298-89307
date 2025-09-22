@@ -120,6 +120,24 @@ npm start
 - All Supabase credentials are read from env; do not hardcode secrets.
 - If you prefer private storage, disable public bucket and switch the app to use signed URLs for preview/download and adjust RLS accordingly.
 
+## Troubleshooting RLS insert failures
+
+If manual insert in Supabase SQL Editor works but frontend insert fails with RLS:
+- Open browser DevTools Console and try an upload again.
+- You should see logs from:
+  - [supabaseClient] Using URL/key — verify URL origin and that the anon key mask matches your project’s anon key
+  - [UploadModal] pre-insert getSession — confirm hasSession=true and userId present
+  - [UploadModal] runtime context — ensure inIframe=false or that your embedding origin allows auth
+  - [UploadModal] about to insert notes row — verify payload (no owner field) and file_path present
+  - [UploadModal] session before insert — confirm session still valid
+- If hasSession is false, re-check:
+  - Authentication > URL Configuration (Site URL and Redirect URLs allow your current origin and /auth/callback)
+  - That you completed /auth/callback after sign-in
+- If session is present but insert still blocked:
+  - Confirm notes.owner default is auth.uid()
+  - Confirm policy “Allow insert for authenticated users” with check (auth.uid() = owner or owner is null)
+  - Ensure you are not sending an owner value from the client (the app intentionally doesn’t)
+
 ## Troubleshooting note (Supabase SQL policies)
 If you see `ERROR: 42710: policy ... already exists` when running the SQL for policies, it means the policy has already been created. This is not a problem unless you need to change the rule. In that case, either:
 - Use `CREATE OR REPLACE POLICY` where applicable, or
