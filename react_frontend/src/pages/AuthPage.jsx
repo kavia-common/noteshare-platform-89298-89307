@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { getURL } from '../utils/getURL';
 
 // PUBLIC_INTERFACE
 export default function AuthPage() {
@@ -22,11 +23,12 @@ export default function AuthPage() {
         if (err) throw err;
         navigate('/');
       } else {
+        const redirectTo = getURL();
         const { error: err } = await supabase.auth.signUp({
           email,
           password: pass,
           options: {
-            emailRedirectTo: window.location.origin
+            emailRedirectTo: redirectTo
           }
         });
         if (err) throw err;

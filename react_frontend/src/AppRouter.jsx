@@ -7,6 +7,8 @@ import AuthPage from './pages/AuthPage';
 import PreviewPage from './pages/PreviewPage';
 import ProfilePage from './pages/ProfilePage';
 import UploadModal from './components/UploadModal';
+import AuthCallback from './pages/AuthCallback';
+import AuthError from './pages/AuthError';
 
 // PUBLIC_INTERFACE
 export default function AppRouter() {
@@ -32,6 +34,8 @@ export default function AppRouter() {
       <Routes>
         <Route path="/" element={<Dashboard session={session} onUpload={() => setShowUpload(true)} refreshKey={refreshKey} />} />
         <Route path="/login" element={session ? <Navigate to="/" replace /> : <AuthPage />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/auth/error" element={<AuthError />} />
         <Route path="/preview/:id" element={<PreviewPage />} />
         <Route path="/profile" element={session ? <ProfilePage /> : <Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
