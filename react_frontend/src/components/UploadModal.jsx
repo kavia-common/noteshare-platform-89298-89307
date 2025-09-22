@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase, requireAuthSession, getCurrentUser } from '../lib/supabaseClient';
 
 /**
@@ -21,9 +21,36 @@ export default function UploadModal({ onClose, onUploaded }) {
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [success, setSuccess] = useState('');
+  const [hasSession, setHasSession] = useState(false);
 
   const maxMb = Number(process.env.REACT_APP_MAX_UPLOAD_MB || 50);
   const maxBytes = Number.isFinite(maxMb) && maxMb > 0 ? maxMb * 1024 * 1024 : 50 * 1024 * 1024;
+
+  // Proactively check session to disable submit when unauthenticated
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (!active) return;
+        if (error) {
+          setHasSession(false);
+        } else {
+          setHasSession(Boolean(data?.session));
+        }
+      } catch {
+        if (active) setHasSession(false);
+      }
+    })();
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (!active) return;
+      setHasSession(Boolean(session));
+    });
+    return () => {
+      active = false;
+      sub?.subscription?.unsubscribe?.();
+    };
+  }, []);
 
   const handleFileChange = (e) => {
     const f = e.target.files?.[0] || null;
@@ -51,12 +78,18 @@ export default function UploadModal({ onClose, onUploaded }) {
     setError('');
     setWarning('');
     setSuccess('');
+
+    // Block early if no session is active
+    if (!hasSession) {
+      setError('You are not signed in. Please log in to upload notes.');
+      return;
+    }
     if (!file) return setError('Please select a PDF to upload.');
     if (!title.trim()) return setError('Title is required.');
 
     setBusy(true);
     try {
-      // Ensure user is authenticated before any storage/db action
+      // Ensure user is authenticated before any storage/db action (double check with throwing method)
       const session = await requireAuthSession();
       const user = await getCurrentUser();
       if (!session || !user) {
@@ -83,6 +116,7 @@ export default function UploadModal({ onClose, onUploaded }) {
         .from('notes')
         .upload(objectPath, file, { contentType: 'application/pdf', upsert: false });
       if (upErr) throw upErr;
+      if (!up?.path) throw new Error('Upload failed to return a file path.');
 
       // Attempt to build a public URL. If the bucket is not public, this may be null/empty.
       const { data: pub } = supabase.storage.from('notes').getPublicUrl(up.path);
@@ -121,8 +155,8 @@ export default function UploadModal({ onClose, onUploaded }) {
       const msg = raw.toLowerCase();
       let friendly = raw;
 
-      // Refined error classification including auth/session checks
-      if (msg.includes('must be logged in') || msg.includes('no current session')) {
+      // Refined error classification including auth/session checks and RLS/owner default tips
+      if (msg.includes('must be logged in') || msg.includes('no current session') || msg.includes('not signed in')) {
         friendly = 'Please sign in to upload notes. Log in and try again.';
       } else if (msg.includes('permission') || msg.includes('not authorized') || msg.includes('401') || msg.includes('403')) {
         friendly = 'Upload unauthorized. Please log in and ensure a storage policy allows inserts to bucket "notes".';
@@ -132,16 +166,16 @@ export default function UploadModal({ onClose, onUploaded }) {
         friendly = 'Network error during upload. Check your connection and Supabase URL.';
       } else if (msg.includes('conflict')) {
         friendly = 'A file with this name already exists. Please try again (we use a timestamp prefix to avoid collisions).';
-      } else if (msg.includes('row level security') || msg.includes('rls') || msg.includes('violates row-level security policy')) {
-        friendly = 'Database insert blocked by RLS. Ensure the "Allow insert for authenticated users" policy for public.notes is active.';
-      } else if (msg.includes('new row violates row-level security policy')) {
-        friendly = 'RLS prevented the insert. Make sure owner defaults to auth.uid() and the insert policy allows authenticated users.';
+      } else if (msg.includes('row level security') || msg.includes('rls') || msg.includes('violates row-level security policy') || msg.includes('new row violates')) {
+        friendly = 'Database insert blocked by RLS. Ensure you are signed in, the owner column defaults to auth.uid(), and the "Allow insert for authenticated users" policy is present.';
       }
       setError(friendly + ' (See Troubleshoot for help)');
     } finally {
       setBusy(false);
     }
   };
+
+  const disabledSubmit = busy || !hasSession;
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Upload PDF">
@@ -156,21 +190,26 @@ export default function UploadModal({ onClose, onUploaded }) {
           <button className="btn" onClick={onClose} title="Close" disabled={busy}>✕</button>
         </div>
         <form onSubmit={doUpload} style={{ padding: 18, display: 'grid', gap: 12 }}>
+          {!hasSession && (
+            <div role="alert" className="helper" style={{ color: 'var(--color-error)' }}>
+              You are not signed in. Please log in to upload notes.
+            </div>
+          )}
           <label>
             <div className="kicker" style={{ marginBottom: 6 }}>Title</div>
-            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g., Linear Algebra Notes" disabled={busy} />
+            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g., Linear Algebra Notes" disabled={busy || !hasSession} />
           </label>
           <label>
             <div className="kicker" style={{ marginBottom: 6 }}>Description</div>
-            <textarea className="textarea" value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Brief summary, topics covered, or helpful notes…" disabled={busy} />
+            <textarea className="textarea" value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Brief summary, topics covered, or helpful notes…" disabled={busy || !hasSession} />
           </label>
           <label>
             <div className="kicker" style={{ marginBottom: 6 }}>Author</div>
-            <input className="input" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Your name or source" disabled={busy} />
+            <input className="input" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Your name or source" disabled={busy || !hasSession} />
           </label>
           <label>
             <div className="kicker" style={{ marginBottom: 6 }}>Category</div>
-            <select className="select" value={category} onChange={(e) => setCategory(e.target.value)} disabled={busy}>
+            <select className="select" value={category} onChange={(e) => setCategory(e.target.value)} disabled={busy || !hasSession}>
               <option value="math">Mathematics</option>
               <option value="cs">Computer Science</option>
               <option value="physics">Physics</option>
@@ -189,7 +228,7 @@ export default function UploadModal({ onClose, onUploaded }) {
               onChange={handleFileChange}
               required
               aria-describedby="file-help"
-              disabled={busy}
+              disabled={busy || !hasSession}
             />
             <div id="file-help" className="helper">
               Only PDF files are allowed. Max size: {maxMb} MB.
@@ -214,7 +253,9 @@ export default function UploadModal({ onClose, onUploaded }) {
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
-            <button disabled={busy} className="btn btn-primary" type="submit">{busy ? 'Uploading…' : 'Upload'}</button>
+            <button disabled={disabledSubmit} className="btn btn-primary" type="submit">
+              {busy ? 'Uploading…' : (hasSession ? 'Upload' : 'Login required')}
+            </button>
           </div>
         </form>
       </div>
