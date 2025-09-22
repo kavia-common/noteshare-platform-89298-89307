@@ -11,6 +11,10 @@ A modern, responsive SPA for uploading, browsing, searching, previewing, and dow
 - Profile page for basic user information
 - Ocean Professional theme (blue with amber accents), smooth shadows, rounded corners
 
+## Prerequisites
+- Node.js 18+
+- A Supabase project (https://supabase.com)
+
 ## Setup
 1) Install dependencies
 ```
@@ -22,31 +26,95 @@ Create `.env` at `react_frontend/.env`:
 ```
 REACT_APP_SUPABASE_URL=your_supabase_url
 REACT_APP_SUPABASE_KEY=your_supabase_anon_key
+
+# Optional
+# Maximum upload size in MB for PDFs (default 50)
+REACT_APP_MAX_UPLOAD_MB=50
+
+# Optional site URL used for auth redirects; if omitted, window.location.origin is used
+# REACT_APP_SITE_URL=https://your-production-domain
 ```
 
 3) Supabase configuration (required)
-- Create a public Storage bucket named `notes`
-- Create a table `notes` with columns:
-  - id: uuid primary key default uuid_generate_v4() (or gen_random_uuid())
-  - title: text
-  - description: text
-  - author: text
-  - category: text
-  - file_path: text
-  - file_size: bigint
-  - public_url: text
-  - created_at: timestamptz default now()
-- Enable RLS and add policies:
-  - Select: allow for all (or authenticated) as per your needs
-  - Insert: allow for authenticated users
-- Ensure Storage bucket is public or provide signed URL logic
+- Storage bucket
+  - Create a public Storage bucket named `notes`
+  - Add a storage policy to allow authenticated users to upload:
+    - SQL (run in Supabase SQL Editor):
+      ```
+      create policy "allow uploads for authenticated"
+      on storage.objects for insert
+      to authenticated
+      with check (bucket_id = 'notes');
+      ```
+- Database schema and RLS
+  - Create table `public.notes` with columns used by the app:
+    ```
+    BEGIN;
+    create extension if not exists "pgcrypto";
+    create table if not exists public.notes (
+      id uuid primary key default gen_random_uuid(),
+      title text not null,
+      description text,
+      author text,
+      category text,
+      file_path text not null,
+      file_size bigint,
+      public_url text,
+      created_at timestamptz not null default now(),
+      owner uuid default auth.uid()
+    );
+    alter table public.notes enable row level security;
+    COMMIT;
+    ```
+  - Add RLS policies:
+    ```
+    -- Allow anyone to read
+    create policy "Allow select for all users"
+    on public.notes
+    for select
+    using (true);
 
-4) Run
+    -- Allow authenticated users to insert (owner defaults to auth.uid())
+    create policy "Allow insert for authenticated users"
+    on public.notes
+    for insert
+    to authenticated
+    with check (auth.uid() = owner or owner is null);
+
+    -- Optional: owner-only updates/deletes
+    create policy "Allow update for owner"
+    on public.notes
+    for update
+    to authenticated
+    using (auth.uid() = owner);
+
+    create policy "Allow delete for owner"
+    on public.notes
+    for delete
+    to authenticated
+    using (auth.uid() = owner);
+    ```
+- Authentication URL settings
+  - In Supabase Dashboard > Authentication > URL Configuration:
+    - Site URL: http://localhost:3000 (for local dev) and your production URL
+    - Redirect URLs:
+      - http://localhost:3000/**
+      - https://your-production-domain/**
+  - This app handles the callback at `/auth/callback`. Ensure your redirect patterns allow that path.
+
+4) Run the app
 ```
 npm start
 ```
 
+## How it works (supabase)
+- Supabase client is configured in `src/lib/supabaseClient.js` and reads env vars `REACT_APP_SUPABASE_URL` and `REACT_APP_SUPABASE_KEY`.
+- Uploads happen in `src/components/UploadModal.jsx`. A PDF is uploaded to the `notes` storage bucket, `getPublicUrl` is used to generate a public URL, and a row is inserted into `public.notes`.
+- The Dashboard (`src/pages/Dashboard.jsx`) queries `public.notes` and applies server-side filters (ilike for search across title/description/author, and category eq). It falls back to client-side filters if server-side filtering fails.
+- Preview (`src/pages/PreviewPage.jsx`) renders the stored `public_url` in an iframe and shows guidance if the URL is not reachable.
+- Auth callback is handled by `src/pages/AuthCallback.jsx` using `supabase.auth.getSessionFromUrl()`.
+
 ## Notes
-- Signup uses emailRedirectTo = window.location.origin
-- All supabase credentials are read from env; do not hardcode secrets
-- Extend UI and data model as needed
+- Signup uses `emailRedirectTo = window.location.origin` by default. If you configure `REACT_APP_SITE_URL`, it should align with Supabase Authentication settings.
+- All Supabase credentials are read from env; do not hardcode secrets.
+- If you prefer private storage, disable public bucket and switch the app to use signed URLs for preview/download and adjust RLS accordingly.
