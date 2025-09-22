@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useId, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
 // PUBLIC_INTERFACE
@@ -8,19 +8,38 @@ export default function Navbar({ session, onUpload }) {
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('all');
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
+  // Generate stable ids for inputs to connect labels (a11y)
+  const searchInputId = useId();
+  const categorySelectId = useId();
+
+  // Keep internal state in sync with URL params
   useEffect(() => {
     setQ(searchParams.get('q') || '');
     setCat(searchParams.get('cat') || 'all');
   }, [searchParams]);
 
+  // Helper: build next params object consistently (omit defaults)
+  const buildParams = (nextQ, nextCat) => {
+    const params = {};
+    if (nextQ && nextQ.trim().length > 0) params.q = nextQ.trim();
+    if (nextCat && nextCat !== 'all') params.cat = nextCat;
+    return params;
+  };
+
   const onSubmit = (e) => {
     e.preventDefault();
-    const next = {};
-    if (q) next.q = q;
-    if (cat && cat !== 'all') next.cat = cat;
-    setSearchParams(next);
+    const next = buildParams(q, cat);
+    setSearchParams(next, { replace: false });
+    if (location.pathname !== '/') navigate('/');
+  };
+
+  const onCategoryChange = (value) => {
+    setCat(value);
+    const next = buildParams(q, value);
+    setSearchParams(next, { replace: false });
     if (location.pathname !== '/') navigate('/');
   };
 
@@ -30,51 +49,78 @@ export default function Navbar({ session, onUpload }) {
   };
 
   return (
-    <div className="navbar">
+    <div className="navbar" role="navigation" aria-label="Primary">
       <div className="nav-inner">
         <Link to="/" className="brand" aria-label="NoteShare Home">
-          <div className="brand-mark">📘</div>
+          <div className="brand-mark" aria-hidden="true">📘</div>
           <span>NoteShare</span>
         </Link>
 
-        <form className="search" onSubmit={onSubmit} role="search" aria-label="Search notes">
-          <span>🔎</span>
+        <form
+          className="search"
+          onSubmit={onSubmit}
+          role="search"
+          aria-label="Search notes"
+        >
+          <label htmlFor={searchInputId} className="helper" style={{ position: 'absolute', left: -9999 }}>
+            Search query
+          </label>
+          <span aria-hidden="true">🔎</span>
           <input
+            id={searchInputId}
             value={q}
             placeholder="Search notes, titles, authors…"
             onChange={(e) => setQ(e.target.value)}
-            aria-label="Search query"
+            aria-describedby={`${searchInputId}-desc`}
           />
+          <span id={`${searchInputId}-desc`} className="helper" style={{ position: 'absolute', left: -9999 }}>
+            Type a keyword and press Enter to search
+          </span>
         </form>
 
-        <select
-          className="select"
-          value={cat}
-          onChange={(e) => { setCat(e.target.value); setSearchParams({ q, cat: e.target.value }); }}
-          aria-label="Category filter"
-          style={{ maxWidth: 180 }}
-        >
-          <option value="all">All Categories</option>
-          <option value="math">Mathematics</option>
-          <option value="cs">Computer Science</option>
-          <option value="physics">Physics</option>
-          <option value="biology">Biology</option>
-          <option value="business">Business</option>
-          <option value="literature">Literature</option>
-          <option value="other">Other</option>
-        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label htmlFor={categorySelectId} className="helper" style={{ position: 'absolute', left: -9999 }}>
+            Category filter
+          </label>
+          <select
+            id={categorySelectId}
+            className="select"
+            value={cat}
+            onChange={(e) => onCategoryChange(e.target.value)}
+            aria-label="Category filter"
+            style={{ maxWidth: 180 }}
+          >
+            <option value="all">All Categories</option>
+            <option value="math">Mathematics</option>
+            <option value="cs">Computer Science</option>
+            <option value="physics">Physics</option>
+            <option value="biology">Biology</option>
+            <option value="business">Business</option>
+            <option value="literature">Literature</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
 
         <div className="nav-spacer" />
 
-        <button className="btn btn-primary" onClick={onUpload}>Upload</button>
+        <button
+          className="btn btn-primary"
+          onClick={onUpload}
+          aria-label="Open upload modal"
+          type="button"
+        >
+          Upload
+        </button>
 
         {session ? (
-          <>
-            <Link className="btn" to="/profile">Profile</Link>
-            <button className="btn" onClick={logout}>Logout</button>
-          </>
+          <div role="group" aria-label="User menu" style={{ display: 'flex', gap: 8 }}>
+            <Link className="btn" to="/profile" aria-label="View profile">Profile</Link>
+            <button className="btn" onClick={logout} type="button" aria-label="Log out">
+              Logout
+            </button>
+          </div>
         ) : (
-          <Link className="btn" to="/login">Login</Link>
+          <Link className="btn" to="/login" aria-label="Go to login">Login</Link>
         )}
       </div>
     </div>
