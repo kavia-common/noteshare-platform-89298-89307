@@ -8,6 +8,10 @@ import { supabase } from '../lib/supabaseClient';
  * - Storage bucket: notes (public)
  * - Table: notes (id uuid pk default gen_random_uuid(), title text, description text, author text, category text, file_path text, file_size bigint, public_url text, created_at timestamptz default now())
  *   with Row Level Security enabled and suitable policies for read/insert by authenticated users.
+ *
+ * Validation:
+ * - Only PDF files are accepted.
+ * - Maximum size is configurable via REACT_APP_MAX_UPLOAD_MB (defaults to 50MB).
  */
 // PUBLIC_INTERFACE
 export default function UploadModal({ onClose, onUploaded }) {
@@ -19,21 +23,56 @@ export default function UploadModal({ onClose, onUploaded }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  // Read max size from env (in MB). Defaults to 50MB.
+  const maxMb = Number(process.env.REACT_APP_MAX_UPLOAD_MB || 50);
+  const maxBytes = Number.isFinite(maxMb) && maxMb > 0 ? maxMb * 1024 * 1024 : 50 * 1024 * 1024;
+
+  // Validate immediately on file selection to provide instant feedback
+  const handleFileChange = (e) => {
+    const f = e.target.files?.[0] || null;
+    setFile(f);
+    setError('');
+
+    if (!f) return;
+
+    // Some browsers may not set file.type; fallback to extension check
+    const isPdfMime = f.type === 'application/pdf';
+    const isPdfExt = /\.pdf$/i.test(f.name || '');
+    if (!(isPdfMime || isPdfExt)) {
+      setError('Only PDF files are allowed.');
+      return;
+    }
+    if (f.size > maxBytes) {
+      const overBy = ((f.size - maxBytes) / (1024 * 1024)).toFixed(2);
+      setError(`File is too large. Maximum allowed is ${maxMb} MB (over by ${overBy} MB).`);
+      return;
+    }
+  };
+
   const doUpload = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Defensive validation before upload
     if (!file) {
       setError('Please select a PDF to upload.');
       return;
     }
-    if (file.type !== 'application/pdf') {
-      setError('Only PDF files are supported.');
+    const isPdfMime = file.type === 'application/pdf';
+    const isPdfExt = /\.pdf$/i.test(file.name || '');
+    if (!(isPdfMime || isPdfExt)) {
+      setError('Only PDF files are allowed.');
+      return;
+    }
+    if (file.size > maxBytes) {
+      setError(`File is too large. Maximum allowed is ${maxMb} MB.`);
       return;
     }
     if (!title.trim()) {
       setError('Title is required.');
       return;
     }
+
     setBusy(true);
     try {
       // Upload to Storage
@@ -105,11 +144,24 @@ export default function UploadModal({ onClose, onUploaded }) {
           </label>
           <label>
             <div className="kicker" style={{ marginBottom: 6 }}>PDF File</div>
-            <input className="input" type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} required />
-            <div className="helper">Max size depends on your Supabase project limits.</div>
+            <input
+              className="input"
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileChange}
+              required
+              aria-describedby="file-help"
+            />
+            <div id="file-help" className="helper">
+              Only PDF files are allowed. Max size: {maxMb} MB.
+            </div>
           </label>
 
-          {error && <div style={{ color: 'var(--color-error)' }}>{error}</div>}
+          {error && (
+            <div role="alert" aria-live="polite" style={{ color: 'var(--color-error)' }}>
+              {error}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button type="button" className="btn" onClick={onClose}>Cancel</button>
